@@ -7,20 +7,20 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Style untuk layout Masonry agar rasio foto tampil alami */
+    /* Masonry Layout: Foto tampil utuh sesuai bentuk aslinya */
     .masonry-grid {
       column-count: 2;
-      column-gap: 1rem;
+      column-gap: 0.75rem;
     }
     @media (min-width: 640px) {
-      .masonry-grid { column-count: 3; }
+      .masonry-grid { column-count: 3; column-gap: 1rem; }
     }
     @media (min-width: 1024px) {
-      .masonry-grid { column-count: 4; }
+      .masonry-grid { column-count: 4; column-gap: 1rem; }
     }
     .masonry-item {
       break-inside: avoid;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
   </style>
 </head>
@@ -49,7 +49,7 @@
     
     <div id="error-msg" class="hidden text-center py-10 text-red-600 bg-red-50 rounded-lg p-4 border border-red-200"></div>
 
-    <!-- Masonry Grid untuk Rasio Foto Asli -->
+    <!-- Grid Tempat Foto -->
     <div id="photo-grid" class="masonry-grid hidden"></div>
   </main>
 
@@ -124,14 +124,15 @@
       grid.innerHTML = '';
 
       allFiles.forEach(file => {
-        const imgUrl = `https://drive.google.com/thumbnail?id=${file.id}&sz=w800`;
+        // Menggunakan sz=w1000 agar Google Drive mengirimkan gambar utuh rasio asli kualitas tinggi
+        const imgUrl = `https://drive.google.com/thumbnail?id=${file.id}&sz=w1000`;
 
         const card = document.createElement('div');
-        card.className = `masonry-item relative rounded-xl overflow-hidden cursor-pointer border-2 transition group bg-gray-100 ${selectedPhotos.has(file.name) ? 'border-emerald-600 ring-2 ring-emerald-600/50' : 'border-gray-200'}`;
+        card.className = `masonry-item relative rounded-xl overflow-hidden cursor-pointer border-2 transition group bg-gray-50 ${selectedPhotos.has(file.name) ? 'border-emerald-600 ring-2 ring-emerald-600/50' : 'border-gray-200'}`;
         card.onclick = () => toggleSelect(file.name, card);
 
         card.innerHTML = `
-          <img src="${imgUrl}" alt="${file.name}" class="w-full h-auto block" loading="lazy" />
+          <img src="${imgUrl}" alt="${file.name}" class="w-full h-auto block object-contain max-h-none" loading="lazy" />
           <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-[10px] text-white truncate">
             ${file.name}
           </div>
