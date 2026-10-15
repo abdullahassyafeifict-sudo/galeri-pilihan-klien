@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pilihan Foto Klien</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-900 text-white min-h-screen pb-24">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-gray-900/90 backdrop-blur border-b border-gray-800 p-4">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 id="client-name" class="text-xl font-bold text-amber-400">Galeri Foto Anda</h1>
+        <p class="text-xs text-gray-400">Pilih foto favorit Anda untuk di-edit</p>
+      </div>
+      <div class="text-right">
+        <span class="text-xs text-gray-400 block">Kuota Terpilih:</span>
+        <span id="counter" class="text-lg font-bold text-amber-400">0 / 0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Gallery Container -->
+  <main class="max-w-6xl mx-auto p-4">
+    <div id="loading" class="text-center py-20 text-gray-400">
+      <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+      <p>Memuat foto dari Google Drive...</p>
+    </div>
+    
+    <div id="error-msg" class="hidden text-center py-10 text-red-400 bg-red-950/30 rounded-lg p-4 border border-red-800"></div>
+
+    <div id="photo-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 hidden"></div>
+  </main>
+
+  <!-- Sticky Bottom Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 shadow-2xl z-50">
+    <div class="max-w-6xl mx-auto flex gap-3">
+      <button onclick="clearSelection()" class="w-1/3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-3 px-4 rounded-xl text-sm transition">
+        Reset
+      </button>
+      <button onclick="sendToWhatsApp()" class="w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40">
+        <i class="fab fa-whatsapp text-lg"></i> Kirim Pilihan
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Ambil parameter dari URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const folderId = urlParams.get('folder');
+    const apiKey = urlParams.get('key');
+    const clientName = urlParams.get('name') || 'Klien';
+    const limit = parseInt(urlParams.get('limit')) || 30;
+    const waNumber = urlParams.get('wa') || ''; // Nomor WA tanpa tanda + (contoh: 62812345678)
+
+    document.getElementById('client-name').innerText = `Galeri Foto ${clientName}`;
+
+    let selectedPhotos = new Set();
+    let allFiles = [];
+
+    function updateCounter() {
+      const counterEl = document.getElementById('counter');
+      counterEl.innerText = `${selectedPhotos.size} / ${limit}`;
+      if (selectedPhotos.size > limit) {
+        counterEl.classList.add('text-red-500');
+        counterEl.classList.remove('text-amber-400');
+      } else {
+        counterEl.classList.remove('text-red-500');
+        counterEl.classList.add('text-amber-400');
+      }
+    }
+
+    async function fetchPhotos() {
+      if (!folderId || !apiKey) {
+        showError("Parameter 'folder' atau 'key' belum diisi pada link URL.");
+        return;
+      }
+
+      try {
+        const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,thumbnailLink)&pageSize=1000&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+          showError(`Google API Error: ${data.error.message}`);
+          return;
+        }
+
+        allFiles = data.files.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+        // Sort berdasarkan nama file
+        allFiles.sort((a, b) => a.name.localeCompare(b.name));
+
+        renderPhotos();
+      } catch (err) {
+        showError("Gagal mengambil data dari Google Drive. Pastikan folder diset 'Anyone with link'.");
+      }
+    }
+
+    function renderPhotos() {
+      document.getElementById('loading').classList.add('hidden');
+      const grid = document.getElementById('photo-grid');
+      grid.classList.remove('hidden');
+      grid.innerHTML = '';
+
+      allFiles.forEach(file => {
+        // Buat thumbnail kualitas lebih tinggi
+        const imgUrl = `https://drive.google.com/thumbnail?id=${file.id}&sz=w600`;
+
+        const card = document.createElement('div');
+        card.className = `relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition group bg-gray-800 ${selectedPhotos.has(file.name) ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-transparent'}`;
+        card.onclick = () => toggleSelect(file.name, card);
+
+        card.innerHTML = `
+          <img src="${imgUrl}" alt="${file.name}" class="w-full h-full object-cover loading="lazy" />
+          <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-[10px] text-gray-300 truncate">
+            ${file.name}
+          </div>
+          <div class="badge absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${selectedPhotos.has(file.name) ? 'bg-amber-400 text-gray-900' : 'bg-black/50 text-white border border-white/30'}">
+            ${selectedPhotos.has(file.name) ? '<i class="fas fa-check"></i>' : ''}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      updateCounter();
+    }
+
+    function toggleSelect(fileName, element) {
+      if (selectedPhotos.has(fileName)) {
+        selectedPhotos.delete(fileName);
+      } else {
+        if (selectedPhotos.size >= limit) {
+          alert(`Maksimal pilihan foto adalah ${limit} foto.`);
+          return;
+        }
+        selectedPhotos.add(fileName);
+      }
+      renderPhotos();
+    }
+
+    function clearSelection() {
+      if (confirm("Apakah Anda yakin ingin membatalkan semua pilihan?")) {
+        selectedPhotos.clear();
+        renderPhotos();
+      }
+    }
+
+    function sendToWhatsApp() {
+      if (selectedPhotos.size === 0) {
+        alert("Pilih minimal 1 foto terlebih dahulu!");
+        return;
+      }
+
+      const listPhotos = Array.from(selectedPhotos).sort().map((name, i) => `${i + 1}. ${name}`).join('\n');
+      const text = `Halo, berikut daftar foto terpilih saya (${clientName}):\n\nTotal: ${selectedPhotos.size} / ${limit} foto\n\nDaftar File:\n${listPhotos}`;
+
+      const encodedText = encodeURIComponent(text);
+      const targetNumber = waNumber ? waNumber : ''; // Jika wa diisi di URL
+      const waUrl = targetNumber 
+        ? `https://wa.me/${targetNumber}?text=${encodedText}`
+        : `https://wa.me/?text=${encodedText}`;
+
+      window.open(waUrl, '_blank');
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').classList.add('hidden');
+      const errEl = document.getElementById('error-msg');
+      errEl.classList.remove('hidden');
+      errEl.innerText = msg;
+    }
+
+    fetchPhotos();
+  </script>
+</body>
+</html>
